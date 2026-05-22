@@ -1,0 +1,7 @@
+# 데이터 및 캐시 폴더 제외
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# 중요 보안 파일 제외
+.env

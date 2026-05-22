@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netflix Style App</title>
+    <style>
+        :root {
+            --netflix-red: #E50914;
+            --netflix-black: #141414;
+            --netflix-dark-gray: #181818;
+            --text-white: #FFFFFF;
+            --text-gray: #AAAAAA;
+        }
+
+        body {
+            background-color: var(--netflix-black);
+            color: var(--text-white);
+            font-family: 'Noto Sans KR', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 30px;
+            gap: 20px;
+        }
+
+        h1 {
+            color: var(--netflix-red);
+            margin: 0;
+            font-size: 2.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .tab-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            color: var(--text-gray);
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 5px 10px;
+            transition: color 0.2s, border-bottom 0.2s;
+        }
+
+        .tab-button.active {
+            color: var(--text-white);
+            border-bottom: 3px solid var(--netflix-red);
+        }
+
+        .filter-container {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        select, input {
+            background-color: var(--netflix-dark-gray);
+            color: var(--text-white);
+            border: 1px solid #333;
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        select:focus, input:focus {
+            border-color: var(--netflix-red);
+        }
+
+        .movie-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 25px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .movie-card {
+            background-color: var(--netflix-dark-gray);
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .movie-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.6);
+        }
+
+        .movie-card img {
+            width: 100%;
+            height: 300px;
+            object-fit: cover;
+        }
+
+        .card-content {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-grow: 1;
+        }
+
+        .card-title {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: var(--text-gray);
+        }
+
+        .rating {
+            color: #ffb400;
+            font-weight: bold;
+        }
+
+        .card-overview {
+            margin: 5px 0 0 0;
+            font-size: 0.85rem;
+            color: #888;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.4;
+            line-clamp: 3;
+            -webkit-line-clamp: 3;
+        }
+
+        .status-message {
+            text-align: center;
+            grid-column: 1 / -1;
+            font-size: 1.2rem;
+            color: var(--text-gray);
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Netflix</h1>
+        <div class="tab-container">
+            <button class="tab-button active" onclick="switchTab('movies')">🎬 영화</button>
+            <button class="tab-button" onclick="switchTab('tv')">📺 TV 프로그램</button>
+        </div>
+    </header>
+
+    <div class="filter-container">
+        <select id="genre-select" onchange="applyFilters()">
+            <option value="">장르 전체</option>
+        </select>
+        <input type="text" id="search-input" placeholder="제목 검색..." oninput="onSearchInput()">
+    </div>
+
+    <main>
+        <div class="movie-grid" id="movie-grid">
+            <p class="status-message">데이터를 불러오는 중입니다...</p>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE_URL = "http://127.0.0.1:8000/api";
+        let currentTab = "movies";
+
+        // 💡 1. 공포 및 미스터리 장르 동기화 완료한 마스터 데이터
+        const genresData = {
+            movies: [
+                { id: "", name: "장르 전체" },
+                { id: "28", name: "액션" },
+                { id: "35", name: "코미디" },
+                { id: "18", name: "드라마" },
+                { id: "27", name: "공포" }, 
+                { id: "53", name: "스릴러" },
+                { id: "878", name: "SF" },
+                { id: "9648", name: "미스터리" }
+            ],
+            tv: [
+                { id: "", name: "장르 전체" },
+                { id: "10759", name: "액션/어드벤처" },
+                { id: "35", name: "코미디" },
+                { id: "18", name: "드라마" },
+                { id: "9648", name: "미스터리" },
+                { id: "10765", name: "SF/판타지" },
+                { id: "10764", name: "리얼리티" }
+            ]
+        };
+
+        // 탭 전환 기능
+        function switchTab(tab) {
+            if (currentTab === tab) return;
+            currentTab = tab;
+            
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            if (tab === 'movies') {
+                document.querySelectorAll('.tab-button')[0].classList.add('active');
+            } else {
+                document.querySelectorAll('.tab-button')[1].classList.add('active');
+            }
+
+            document.getElementById("search-input").value = "";
+            updateGenreOptions();
+            loadContent();
+        }
+
+        // 장르 셀렉트 박스 갱신
+        function updateGenreOptions() {
+            const select = document.getElementById("genre-select");
+            select.innerHTML = "";
+            
+            const options = genresData[currentTab];
+            options.forEach(g => {
+                const opt = document.createElement("option");
+                opt.value = g.id;
+                opt.textContent = g.name;
+                select.appendChild(opt);
+            });
+        }
+
+        // 데이터 로드 연동 함수
+        async function loadContent() {
+            const grid = document.getElementById("movie-grid");
+            grid.innerHTML = `<p class="status-message">로딩 중...</p>`;
+
+            const genre = document.getElementById("genre-select").value;
+            const search = document.getElementById("search-input").value.trim();
+
+            // 백엔드 엔드포인트 조립
+            let url = `${API_BASE_URL}/${currentTab}`;
+            if (search !== "") {
+                url = `${API_BASE_URL}/${currentTab}/search?query=${encodeURIComponent(search)}`;
+            } else if (genre !== "") {
+                url = `${API_BASE_URL}/${currentTab}?genre=${genre}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("네트워크 응답 에러");
+                const data = await response.json();
+                renderCards(data);
+            } catch (error) {
+                console.error("데이터 로드 실패:", error);
+                grid.innerHTML = `<p class="status-message" style="color: #E50914;">데이터를 불러오는 데 실패했습니다.</p>`;
+            }
+        }
+
+        let searchTimer = null;
+
+        function onSearchInput() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                applyFilters();
+            }, 400);
+        }
+
+        function applyFilters() {
+            loadContent();
+        }
+
+        // 🎬 카드 컴포넌트 렌더링 및 클릭 컨텍스트 바인딩
+        function renderCards(items) {
+            const grid = document.getElementById("movie-grid");
+            grid.innerHTML = "";
+
+            if (!items || items.length === 0) {
+                grid.innerHTML = `<p class="status-message">검색 결과 또는 해당하는 콘텐츠가 없습니다.</p>`;
+                return;
+            }
+
+            items.forEach(item => {
+                const card = document.createElement("div");
+                card.className = "movie-card";
+
+                const posterUrl = item.poster_path 
+                    ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+                    : "https://via.placeholder.com/500x750/181818/FFFFFF?text=No+Poster";
+
+                const overviewText = item.overview && item.overview.trim() !== "" 
+                    ? item.overview 
+                    : "본 프로그램의 줄거리는 제공되지 않습니다.";
+
+                const releaseDate = item.release_date || "";
+                const releaseYear = releaseDate ? releaseDate.split("-")[0] : "미정";
+                const rating = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
+
+                card.innerHTML = `
+                    <img src="${posterUrl}" alt="${item.title || '영상'}">
+                    <div class="card-content">
+                        <h3 class="card-title">${item.title || "제목 없음"}</h3>
+                        <div class="card-meta">
+                            <span class="rating">★ ${rating}</span>
+                            <span>${releaseYear}</span>
+                        </div>
+                        <p class="card-overview">${overviewText}</p>
+                    </div>
+                `;
+                
+                // 💡 [핵심 수정] 404/스크립트 중단 오류를 막기 위해 상대 경로 호출 규격 정밀 매핑
+                card.onclick = () => {
+                    window.location.href = `detail.html?id=${item.id}&type=${currentTab}`;
+                };
+
+                grid.appendChild(card);
+            });
+        }
+
+        // 구동 시작점 트리거
+        window.onload = () => {
+            updateGenreOptions();
+            loadContent();
+        };
+    </script>
+</body>
+</html>

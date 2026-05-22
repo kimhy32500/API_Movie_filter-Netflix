@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netflix - 상세 정보</title>
+    <style>
+        :root {
+            --netflix-red: #E50914;
+            --netflix-black: #141414;
+            --netflix-dark-gray: #181818;
+            --text-white: #FFFFFF;
+            --text-gray: #AAAAAA;
+        }
+
+        body {
+            background-color: var(--netflix-black);
+            color: var(--text-white);
+            font-family: 'Noto Sans KR', sans-serif;
+            margin: 0;
+            padding: 4px;
+        }
+
+        /* 상세 페이지 전용 뒤로가기 헤더 */
+        header {
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--text-white);
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: color 0.2s;
+        }
+
+        .back-btn:hover {
+            color: var(--netflix-red);
+        }
+
+        /* 🎬 상세 레이아웃 구조 디자인 */
+        .detail-container {
+            display: flex;
+            max-width: 1100px;
+            margin: 40px auto;
+            gap: 50px;
+            padding: 0 20px;
+        }
+
+        .poster-zone {
+            flex: 0 0 350px;
+        }
+
+        .poster-zone img {
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+        }
+
+        .info-zone {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .movie-title {
+            font-size: 2.8rem;
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .movie-tagline {
+            font-size: 1.2rem;
+            font-style: italic;
+            color: var(--text-gray);
+            margin-bottom: 10px;
+        }
+
+        .meta-line {
+            display: flex;
+            gap: 20px;
+            font-size: 1.05rem;
+            color: #ccc;
+        }
+
+        .rating-badge {
+            color: #ffb400;
+            font-weight: bold;
+        }
+
+        .genres {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .genre-pill {
+            background-color: #333;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .overview-heading {
+            font-size: 1.4rem;
+            margin: 25px 0 10px 0;
+            border-bottom: 2px solid #333;
+            padding-bottom: 8px;
+        }
+
+        .overview-text {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #dddddd;
+        }
+
+        /* 에러 표시용 스타일 */
+        .error-message {
+            text-align: center;
+            margin-top: 100px;
+            color: var(--netflix-red);
+            font-size: 1.3rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <button class="back-btn" onclick="history.back()">⬅️ 홈으로 돌아가기</button>
+    </header>
+
+    <main>
+        <div id="detail-content">
+            <p style="text-align: center; margin-top: 100px; color: var(--text-gray);">상세 정보를 로딩 중입니다...</p>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE_URL = "http://127.0.0.1:8000/api";
+
+        async function loadDetailPage() {
+            // 1. 주소창의 쿼리스트링 파라미터에서 id와 type 추출하기
+            const urlParams = new URLSearchParams(window.location.search);
+            const id = urlParams.get('id');
+            const type = urlParams.get('type'); // 'movies' 또는 'tv'
+
+            if (!id || !type) {
+                document.getElementById("detail-content").innerHTML = `<p class="error-message">잘못된 접근입니다. 필수 파라미터가 누락되었습니다.</p>`;
+                return;
+            }
+
+            // 2. 백엔드 main.py 규격 매핑에 맞춰 동적 엔드포인트 조립
+            // 영화: /api/movies/{id}, TV: /api/tv/{id}
+            const endpoint = `${API_BASE_URL}/${type}/${id}`;
+
+            try {
+                const response = await fetch(endpoint);
+                if (!response.ok) {
+                    if (response.status === 404) throw new Error("리소스를 찾을 수 없습니다 (404)");
+                    throw new Error("네트워크 응답 상태 불량");
+                }
+                const data = await response.json();
+                renderDetail(data, type);
+            } catch (error) {
+                console.error("상세 정보 조회 실패:", error);
+                document.getElementById("detail-content").innerHTML = `<p class="error-message">상세 정보를 불러오는 데 실패했습니다.<br><span style="font-size:1rem; color:gray;">${error.message}</span></p>`;
+            }
+        }
+
+        // 3. 수신한 데이터를 전용 UI 레이아웃에 맞춰 렌더링
+        function renderDetail(item, type) {
+            const container = document.getElementById("detail-content");
+            
+            // TMDB 데이터 규격 예외 처리 연동 (영화는 title, TV는 name)
+            const title = item.title || item.name || "제목 없음";
+            const releaseDate = item.release_date || item.first_air_date || "날짜 정보 없음";
+            const posterPath = item.poster_path 
+                ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+                : "https://via.placeholder.com/500x750/181818/FFFFFF?text=No+Poster";
+            
+            const rating = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
+            const tagline = item.tagline ? item.tagline : "";
+            const overview = item.overview && item.overview.trim() !== "" ? item.overview : "이 컨텐츠는 줄거리가 제공되지 않습니다.";
+
+            // 장르 배지 컴포넌트 조립
+            let genreBadges = "";
+            if (item.genres && item.genres.length > 0) {
+                genreBadges = item.genres.map(g => `<span class="genre-pill">${g.name}</span>`).join("");
+            }
+
+            // 상세 레이아웃 주입
+            container.innerHTML = `
+                <div class="detail-container">
+                    <div class="poster-zone">
+                        <img src="${posterPath}" alt="${title}">
+                    </div>
+                    <div class="info-zone">
+                        <h2 class="movie-title">${title}</h2>
+                        ${tagline ? `<p class="movie-tagline">"${tagline}"</p>` : ''}
+                        
+                        <div class="meta-line">
+                            <span class="rating-badge">★ ${rating}</span>
+                            <span>개봉/공개일: ${releaseDate}</span>
+                        </div>
+
+                        <div class="genres">
+                            ${genreBadges}
+                        </div>
+
+                        <h3 class="overview-heading">줄거리</h3>
+                        <p class="overview-text">${overview}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 구동 시작점 트리거 연동
+        window.onload = loadDetailPage;
+    </script>
+</body>
+</html>

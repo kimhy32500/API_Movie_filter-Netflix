@@ -1,0 +1,521 @@
+{
+  "info": {
+    "_postman_id": "ea9d9ad0-b61b-4176-b431-c92214c0554f",
+    "name": "Movie_Filter_NF_Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "13320964",
+    "_collection_link": "https://go.postman.co/collection/13320964-ea9d9ad0-b61b-4176-b431-c92214c0554f?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "영화 전체",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "",
+              "pm.test('[TC-R01] 상태 코드 200 및 데이터 반환 확인', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(jsonData.length).to.be.above(0);",
+              "});",
+              "",
+              "pm.test('[TC-R02] 필수 필드 구조 검증', function () {",
+              "    if (jsonData.length > 0) {",
+              "        pm.expect(jsonData[0]).to.have.property('id').and.be.a('number');",
+              "        pm.expect(jsonData[0]).to.have.property('title').and.be.a('string');",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/movies",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "movies"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "영화 장르",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// 첫 실행 시 영화 장르 목록 초기화",
+              "var movieGenres = pm.collectionVariables.get('movieGenres');",
+              "var parsed = JSON.parse(movieGenres);",
+              "",
+              "if (!parsed || parsed.length === 0) {",
+              "    parsed = [28, 35, 18, 27, 53, 878, 9648];",
+              "    pm.collectionVariables.set('movieGenres', JSON.stringify(parsed));",
+              "}",
+              "",
+              "// 현재 순회할 장르를 URL 변수로 세팅",
+              "pm.collectionVariables.set('currentGenre', parsed[0]);",
+              "console.log('[영화 장르] 현재 테스트 장르 ID: ' + parsed[0]);"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "var currentGenre = Number(pm.collectionVariables.get('currentGenre'));",
+              "",
+              "pm.test('[TC-R03] 줄거리 Null 방어 검사 - 장르: ' + currentGenre, function () {",
+              "    for (var i = 0; i < jsonData.length; i++) {",
+              "        pm.expect(jsonData[i].overview).to.not.be.null;",
+              "    }",
+              "});",
+              "",
+              "pm.test('[TC-R04] 장르 필터링 정상 작동 검증 - 장르: ' + currentGenre, function () {",
+              "    for (var i = 0; i < jsonData.length; i++) {",
+              "        pm.expect(jsonData[i].genre_ids).to.include(currentGenre);",
+              "    }",
+              "});",
+              "",
+              "pm.test('[TC-R05] 평점 내림차순 정렬 및 20개 제한 검증 - 장르: ' + currentGenre, function () {",
+              "    pm.expect(jsonData.length).to.be.at.most(20);",
+              "    for (var j = 0; j < jsonData.length - 1; j++) {",
+              "        pm.expect(jsonData[j].vote_average).to.be.at.least(jsonData[j+1].vote_average);",
+              "    }",
+              "});",
+              "",
+              "// 다음 장르로 순회",
+              "var movieGenres = JSON.parse(pm.collectionVariables.get('movieGenres'));",
+              "movieGenres.shift();",
+              "",
+              "if (movieGenres.length > 0) {",
+              "    pm.collectionVariables.set('movieGenres', JSON.stringify(movieGenres));",
+              "    postman.setNextRequest('영화 장르');",
+              "} else {",
+              "    // 전체 순회 완료 → 초기화 후 다음 TC로",
+              "    pm.collectionVariables.set('movieGenres', '[]');",
+              "    console.log('[영화 장르] 전체 장르 순회 완료');",
+              "    postman.setNextRequest('영화 검색');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/movies?genre={{currentGenre}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "movies"
+          ],
+          "query": [
+            {
+              "key": "genre",
+              "value": "{{currentGenre}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "영화 검색",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "",
+              "var rawQuery = pm.request.url.query.get('query') || '';",
+              "var sentQuery = decodeURIComponent(rawQuery);",
+              "",
+              "pm.test('[TC-R06] 검색어 필터링 일치 여부 검증', function () {",
+              "    pm.expect(jsonData.length).to.be.above(0);",
+              "",
+              "    var movieTitle = jsonData[0].title.toLowerCase();",
+              "    var searchKeyword = sentQuery.toLowerCase();",
+              "",
+              "    pm.expect(movieTitle).to.include(searchKeyword);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/movies/search?query={{movie_search_query}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "movies",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": "{{movie_search_query}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "영화 빈 검색어",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[TC-R07] 빈 검색어 입력 시 400 에러 반환 확인', function () {",
+              "    pm.response.to.have.status(400);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/movies/search?query=",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "movies",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": ""
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "영화 없는 ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[TC-R08] 존재하지 않는 ID 조회 시 404 에러 반환 확인', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/movies/{{$randomInt}}{{$randomInt}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "movies",
+            "{{$randomInt}}{{$randomInt}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "TV 전체",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "",
+              "pm.test('[TC-R09] 상태 코드 200 및 데이터 반환 확인', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(jsonData.length).to.be.above(0);",
+              "});",
+              "",
+              "pm.test('[TC-R10] 필수 필드 구조 검증', function () {",
+              "    if (jsonData.length > 0) {",
+              "        pm.expect(jsonData[0]).to.have.property('id').and.be.a('number');",
+              "        pm.expect(jsonData[0]).to.have.property('title').and.be.a('string');",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/tv",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "tv"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "TV 장르",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// 첫 실행 시 TV 장르 목록 초기화",
+              "var tvGenres = pm.collectionVariables.get('tvGenres');",
+              "var parsed = JSON.parse(tvGenres);",
+              "",
+              "if (!parsed || parsed.length === 0) {",
+              "    parsed = [10759, 35, 18, 9648, 10765, 10764];",
+              "    pm.collectionVariables.set('tvGenres', JSON.stringify(parsed));",
+              "}",
+              "",
+              "// 현재 순회할 장르를 URL 변수로 세팅",
+              "pm.collectionVariables.set('currentGenre', parsed[0]);",
+              "console.log('[TV 장르] 현재 테스트 장르 ID: ' + parsed[0]);"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "var currentGenre = Number(pm.collectionVariables.get('currentGenre'));",
+              "",
+              "pm.test('[TC-R11] 줄거리 Null 방어 검사 - 장르: ' + currentGenre, function () {",
+              "    for (var i = 0; i < jsonData.length; i++) {",
+              "        pm.expect(jsonData[i].overview).to.not.be.null;",
+              "    }",
+              "});",
+              "",
+              "pm.test('[TC-R12] 장르 필터링 정상 작동 검증 - 장르: ' + currentGenre, function () {",
+              "    for (var i = 0; i < jsonData.length; i++) {",
+              "        pm.expect(jsonData[i].genre_ids).to.include(currentGenre);",
+              "    }",
+              "});",
+              "",
+              "pm.test('[TC-R13] 평점 내림차순 정렬 및 20개 제한 검증 - 장르: ' + currentGenre, function () {",
+              "    pm.expect(jsonData.length).to.be.at.most(20);",
+              "    for (var j = 0; j < jsonData.length - 1; j++) {",
+              "        pm.expect(jsonData[j].vote_average).to.be.at.least(jsonData[j+1].vote_average);",
+              "    }",
+              "});",
+              "",
+              "// 다음 장르로 순회",
+              "var tvGenres = JSON.parse(pm.collectionVariables.get('tvGenres'));",
+              "tvGenres.shift();",
+              "",
+              "if (tvGenres.length > 0) {",
+              "    pm.collectionVariables.set('tvGenres', JSON.stringify(tvGenres));",
+              "    postman.setNextRequest('TV 장르');",
+              "} else {",
+              "    // 전체 순회 완료 → 초기화 후 다음 TC로",
+              "    pm.collectionVariables.set('tvGenres', '[]');",
+              "    console.log('[TV 장르] 전체 장르 순회 완료');",
+              "    postman.setNextRequest('TV 검색');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/tv?genre={{currentGenre}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "tv"
+          ],
+          "query": [
+            {
+              "key": "genre",
+              "value": "{{currentGenre}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "TV 검색",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "",
+              "var rawQuery = pm.request.url.query.get('query') || '';",
+              "var sentQuery = decodeURIComponent(rawQuery);",
+              "",
+              "pm.test('[TC-R14] 검색어 필터링 일치 여부 검증', function () {",
+              "    pm.expect(jsonData.length).to.be.above(0);",
+              "",
+              "    var tvTitle = jsonData[0].title.toLowerCase();",
+              "    var searchKeyword = sentQuery.toLowerCase();",
+              "",
+              "    pm.expect(tvTitle).to.include(searchKeyword);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/tv/search?query={{tv_search_query}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "tv",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": "{{tv_search_query}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "TV 빈 검색어",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[TC-R15] 빈 검색어 입력 시 400 에러 반환 확인', function () {",
+              "    pm.response.to.have.status(400);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/tv/search?query=",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "tv",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": ""
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "TV 없는 ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[TC-R16] 존재하지 않는 ID 조회 시 404 에러 반환 확인', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/tv/{{$randomInt}}{{$randomInt}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "tv",
+            "{{$randomInt}}{{$randomInt}}"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "currentGenre",
+      "value": "28"
+    },
+    {
+      "key": "movieGenres",
+      "value": "[]"
+    },
+    {
+      "key": "tvGenres",
+      "value": "[]"
+    }
+  ]
+}
